@@ -40,6 +40,7 @@ type CropPlan = {
   daysToHarvest: number
   yieldPerPlant: string
   totalYieldEstimate: string
+  yieldBasis?: string
   waterSchedule: string
   plantingWindow: string
   cropSections: CropSection[]
@@ -498,8 +499,11 @@ export function CropPlanner() {
                     </p>
                   </div>
                   <div className="border-l border-border pl-8">
-                    <p className="text-2xl font-bold">{plan.totalYieldEstimate}</p>
-                    <p className="text-sm text-muted-foreground">estimated total yield</p>
+                    <p className="text-4xl font-bold text-primary">{plan.totalYieldEstimate}</p>
+                    <p className="text-base text-muted-foreground">est. total yield</p>
+                    {plan.yieldBasis && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">{plan.yieldBasis}</p>
+                    )}
                   </div>
                 </div>
 

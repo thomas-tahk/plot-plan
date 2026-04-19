@@ -42,7 +42,13 @@ MULTI-CROP plots:
 When USDA NASS yield data is provided, use it to anchor yield estimates.
 Always include a note about row count (e.g. "15 rows of 13 plants each") as farmers think in rows.
 Always tailor advice to the specific region's frost dates, water situation, and soil.
-Keep notes practical and actionable — no jargon.`
+Keep notes practical and actionable — no jargon.
+
+YIELD FORMAT (strict):
+- totalYieldEstimate MUST be a clean short value: "135 lbs", "2,400 lbs", "~180 lbs" — number + unit only.
+- Do NOT embed source citations, math, or "based on" phrases inside totalYieldEstimate.
+- Put the source into yieldBasis, short: "NM NASS 2025 (13,500 lbs/ac)", "typical NM yield", "grower-reported avg".
+- Section totalYieldEstimate follows the same rule: "90 lbs" not "90 lbs (based on ...)".`
 
 const PLAN_TOOL: Anthropic.Tool = {
   name: "generate_crop_plan",
@@ -59,7 +65,8 @@ const PLAN_TOOL: Anthropic.Tool = {
       plantingDepth:      { type: "string", description: "Primary crop planting depth" },
       daysToHarvest:      { type: "number", description: "Primary crop days from transplant to first harvest" },
       yieldPerPlant:      { type: "string", description: "Primary crop yield per plant" },
-      totalYieldEstimate: { type: "string", description: "Combined total yield estimate for the plot. Cite NASS source if provided." },
+      totalYieldEstimate: { type: "string", description: "Clean total yield — number + unit only, e.g. '135 lbs'. No citations, no math, no 'based on'." },
+      yieldBasis:         { type: "string", description: "Very short source note, max ~40 chars, e.g. 'NM NASS 2025 (13,500 lbs/ac)' or 'typical NM yield'." },
       waterSchedule:      { type: "string", description: "Watering schedule — note any differences between crops" },
       plantingWindow:     { type: "string", description: "Planting window — note if crops differ" },
       cropSections: {
@@ -75,7 +82,7 @@ const PLAN_TOOL: Anthropic.Tool = {
             bedWidth:         { type: "number" },
             plantsPerRow:     { type: "number" },
             totalPlants:      { type: "number" },
-            totalYieldEstimate: { type: "string" },
+            totalYieldEstimate: { type: "string", description: "Clean yield for this section — number + unit only, e.g. '90 lbs'." },
           },
           required: ["crop","rowStart","rowEnd","spacingInRow","bedWidth","plantsPerRow","totalPlants","totalYieldEstimate"],
         },
@@ -88,7 +95,7 @@ const PLAN_TOOL: Anthropic.Tool = {
     },
     required: [
       "spacingInRow", "bedWidth", "rowSpacing", "plantsPerRow", "totalRows", "totalPlants",
-      "plantingDepth", "daysToHarvest", "yieldPerPlant", "totalYieldEstimate",
+      "plantingDepth", "daysToHarvest", "yieldPerPlant", "totalYieldEstimate", "yieldBasis",
       "waterSchedule", "plantingWindow", "cropSections", "notes",
     ],
   },
