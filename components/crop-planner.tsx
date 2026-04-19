@@ -670,12 +670,14 @@ export function CropPlanner() {
                     <CardContent>
                       <div className="space-y-4">
                         {plan.cropSections.map((section, i) => (
-                          <div key={i} className="flex items-start gap-3">
-                            <span className="mt-1.5 w-4 h-4 rounded-full shrink-0" style={{
-                              background: ["#2d6a4f","#8B3A1F","#2d4a8a","#6a3d8a"][i % 4]
-                            }} />
-                            <div className="flex-1 min-w-0 text-center">
-                              <p className="font-semibold text-xl">{section.crop}</p>
+                          <div key={i}>
+                            <div className="min-w-0 text-center">
+                              <p className="font-semibold text-xl inline-flex items-center gap-2">
+                                <span className="w-4 h-4 rounded-full shrink-0" style={{
+                                  background: ["#2d6a4f","#8B3A1F","#2d4a8a","#6a3d8a"][i % 4]
+                                }} />
+                                {section.crop}
+                              </p>
                               {isEditing ? (
                                 <div className="grid grid-cols-2 gap-2 mt-2 text-left">
                                   <div>
