@@ -102,10 +102,20 @@ const PLAN_TOOL: Anthropic.Tool = {
 }
 
 export async function POST(req: Request) {
-  const { plotWidth, plotLength, crops, region, irrigation } = await req.json()
+  const { plotWidth, plotLength, crops, region, irrigation, overrides } = await req.json()
   const cropList: string[] = Array.isArray(crops) ? crops : [crops]
   const primaryCrop = cropList[0]
   const isMultiCrop = cropList.length > 1
+
+  const ov = overrides ?? {}
+  const overrideLines: string[] = []
+  if (Number.isFinite(ov.spacingInRow)) overrideLines.push(`- Farmer override: in-row plant spacing = ${ov.spacingInRow}" (use this exact value for the primary crop)`)
+  if (Number.isFinite(ov.bedWidth))     overrideLines.push(`- Farmer override: bed width = ${ov.bedWidth}" (use this exact value for the primary crop)`)
+  if (Number.isFinite(ov.aisleWidth) && Number.isFinite(ov.bedWidth)) {
+    overrideLines.push(`- Farmer override: aisle width = ${ov.aisleWidth}" — so rowSpacing for the primary crop = bedWidth + aisle = ${ov.bedWidth + ov.aisleWidth}"`)
+  } else if (Number.isFinite(ov.aisleWidth)) {
+    overrideLines.push(`- Farmer override: aisle width = ${ov.aisleWidth}" (apply to primary crop: rowSpacing = bedWidth + ${ov.aisleWidth})`)
+  }
 
   const plotAcres = (plotWidth * plotLength) / 43560
 
@@ -132,6 +142,7 @@ USDA NASS NM yield data:
 ${nassContext}
 Plot size: ${plotAcres.toFixed(4)} acres
 
+${overrideLines.length > 0 ? `FARMER OVERRIDES (respect these exactly; recalculate plantsPerRow/totalPlants/yield accordingly):\n${overrideLines.join("\n")}\n` : ""}
 ${isMultiCrop ? `Divide the plot rows agronomically between the ${cropList.length} crops. Use one consistent rowSpacing for the whole plot.` : ""}
 Calculate exact plant counts. Tailor all timing and water advice to ${region}.`
 
