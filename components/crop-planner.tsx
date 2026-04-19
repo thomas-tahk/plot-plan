@@ -979,7 +979,9 @@ export function CropPlanner() {
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-base">{p.crop}</p>
+                  <p className="font-semibold text-base">
+                    {(p.plan.cropSections?.map(s => s.crop) ?? p.plan.crops ?? [p.crop]).join(", ")}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {p.plot_width} × {p.plot_length} ft · {new Date(p.created_at).toLocaleDateString()}
                   </p>
@@ -1010,7 +1012,7 @@ export function CropPlanner() {
                   <div className="bg-card rounded-2xl ring-1 ring-border shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-auto p-6 sm:p-8">
                     <div className="flex items-center justify-between mb-4">
                       <Dialog.Title className="text-xl font-bold">
-                        {p.plot_width} × {p.plot_length} ft — {p.crop}
+                        {p.plot_width} × {p.plot_length} ft — {(p.plan.cropSections?.map(s => s.crop) ?? p.plan.crops ?? [p.crop]).join(", ")}
                       </Dialog.Title>
                       <Dialog.Close
                         className="text-muted-foreground hover:text-foreground text-2xl leading-none w-10 h-10 flex items-center justify-center rounded-lg hover:bg-muted"
