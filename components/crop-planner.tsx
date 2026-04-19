@@ -420,11 +420,13 @@ export function CropPlanner() {
           ? "flex flex-col lg:flex-row gap-6 lg:gap-10"
           : "flex flex-col gap-6"
         }>
-          {/* Form */}
-          <div className={layoutMode === "side"
-            ? "lg:w-72 shrink-0 space-y-5"
-            : "w-full max-w-2xl mx-auto space-y-5 bg-card rounded-2xl ring-1 ring-border p-5"
-          }>
+          {/* Form — mobile always uses stacked/card style; lg+ respects layoutMode */}
+          <div className={[
+            "w-full max-w-2xl mx-auto space-y-5 bg-card rounded-2xl ring-1 ring-border p-5",
+            layoutMode === "side"
+              ? "lg:w-72 lg:max-w-none lg:mx-0 lg:shrink-0 lg:bg-transparent lg:ring-0 lg:p-0"
+              : "",
+          ].join(" ")}>
             <div>
               <h2 className="text-lg font-semibold">Your Plot</h2>
               <p className="text-sm text-muted-foreground mt-1">Enter your details to get a planting plan.</p>
