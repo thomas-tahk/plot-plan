@@ -644,7 +644,7 @@ export function CropPlanner() {
                 </Dialog.Root>
 
                 {/* Headline counts */}
-                <div className="bg-card rounded-2xl ring-1 ring-border p-4 flex gap-8 items-center">
+                <div className="bg-card rounded-2xl ring-1 ring-border p-4 flex justify-center gap-8 items-center text-center">
                   <div>
                     <p className="text-5xl font-bold text-primary">{plan.totalPlants}</p>
                     <p className="text-base text-muted-foreground">plants total</p>
@@ -674,10 +674,10 @@ export function CropPlanner() {
                             <span className="mt-1.5 w-4 h-4 rounded-full shrink-0" style={{
                               background: ["#2d6a4f","#8B3A1F","#2d4a8a","#6a3d8a"][i % 4]
                             }} />
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 text-center">
                               <p className="font-semibold text-xl">{section.crop}</p>
                               {isEditing ? (
-                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                <div className="grid grid-cols-2 gap-2 mt-2 text-left">
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Spacing (in)</Label>
                                     <Input
@@ -702,17 +702,17 @@ export function CropPlanner() {
                                 </div>
                               ) : (
                                 <>
-                                  <div className="flex gap-8 mt-2 items-baseline">
+                                  <div className="flex justify-center gap-8 mt-2 items-baseline">
                                     <div>
                                       <p className="text-3xl font-bold text-primary leading-none">{section.totalPlants}</p>
-                                      <p className="text-sm text-muted-foreground mt-1">plants · {section.plantsPerRow}/row</p>
+                                      <p className="text-sm font-medium text-foreground mt-1">plants · {section.plantsPerRow}/row</p>
                                     </div>
                                     <div>
                                       <p className="text-3xl font-bold text-primary leading-none">{section.totalYieldEstimate}</p>
-                                      <p className="text-sm text-muted-foreground mt-1">est. yield</p>
+                                      <p className="text-sm font-medium text-foreground mt-1">est. yield</p>
                                     </div>
                                   </div>
-                                  <p className="text-sm text-muted-foreground mt-2">
+                                  <p className="text-sm font-medium text-foreground mt-2">
                                     Rows {section.rowStart}–{section.rowEnd} · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
                                   </p>
                                 </>
