@@ -164,11 +164,11 @@ export function CropPlanner() {
           crops: form.crops,
           region: form.region,
           irrigation: form.irrigation,
-          overrides: {
+          overrides: form.crops.length === 1 ? {
             spacingInRow: form.spacingInRow ? Math.max(1, Number(form.spacingInRow)) : undefined,
             bedWidth: form.bedWidth ? Math.max(1, Number(form.bedWidth)) : undefined,
             aisleWidth: form.aisleWidth ? Math.max(0, Number(form.aisleWidth)) : undefined,
-          },
+          } : undefined,
         }),
       })
       if (!res.ok) throw new Error("Failed to generate plan")
@@ -477,39 +477,52 @@ export function CropPlanner() {
             ))}
 
             <div className="border-t border-border pt-4">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(s => !s)}
-                className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-              >
-                <span className={`inline-block transition-transform ${showAdvanced ? "rotate-90" : ""}`}>›</span>
-                Advanced (optional)
-              </button>
-              {showAdvanced && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Leave blank to use crop defaults. Fill any to override.
-                  </p>
-                  {([
-                    { key: "spacingInRow" as const, label: "Plant spacing (in)", placeholder: "e.g. 12", min: 1 },
-                    { key: "bedWidth" as const,     label: "Bed width (in)",     placeholder: "e.g. 24", min: 1 },
-                    { key: "aisleWidth" as const,   label: "Aisle width (in)",   placeholder: "e.g. 18", min: 0 },
-                  ]).map(({ key, label, placeholder, min }) => (
-                    <div key={key} className="space-y-1">
-                      <Label className="text-sm font-medium">{label}</Label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        min={min}
-                        placeholder={placeholder}
-                        value={form[key]}
-                        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                        className="h-10 text-base"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+              {(() => {
+                const isMulti = form.crops.length > 1
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => !isMulti && setShowAdvanced(s => !s)}
+                      disabled={isMulti}
+                      className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className={`inline-block transition-transform ${showAdvanced && !isMulti ? "rotate-90" : ""}`}>›</span>
+                      Advanced (optional)
+                    </button>
+                    {isMulti && (
+                      <p className="text-xs text-muted-foreground mt-2 ml-5">
+                        Multi-crop uses AI defaults. You can edit each crop&apos;s spacing &amp; bed width after generating.
+                      </p>
+                    )}
+                    {showAdvanced && !isMulti && (
+                      <div className="mt-3 space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                          Leave blank to use crop defaults. Fill any to override.
+                        </p>
+                        {([
+                          { key: "spacingInRow" as const, label: "Plant spacing (in)", placeholder: "e.g. 12", min: 1 },
+                          { key: "bedWidth" as const,     label: "Bed width (in)",     placeholder: "e.g. 24", min: 1 },
+                          { key: "aisleWidth" as const,   label: "Aisle width (in)",   placeholder: "e.g. 18", min: 0 },
+                        ]).map(({ key, label, placeholder, min }) => (
+                          <div key={key} className="space-y-1">
+                            <Label className="text-sm font-medium">{label}</Label>
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={min}
+                              placeholder={placeholder}
+                              value={form[key]}
+                              onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                              className="h-10 text-base"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
 
             <Button className="w-full h-14 text-lg font-semibold rounded-xl" onClick={handleGenerate} disabled={loading}>
