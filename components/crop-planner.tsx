@@ -190,7 +190,11 @@ export function CropPlanner() {
     setSaved(false)
     setEditedPlan(prev => {
       if (!prev) return prev
-      const aisle = Math.max(0, prev.rowSpacing - prev.bedWidth)
+      const prevBed = Number.isFinite(prev.cropSections?.[0]?.bedWidth)
+        ? prev.cropSections![0].bedWidth
+        : (Number.isFinite(prev.bedWidth) ? prev.bedWidth : newBedWidth)
+      const prevRowSpacing = Number.isFinite(prev.rowSpacing) ? prev.rowSpacing : prevBed + 18
+      const aisle = Math.max(0, prevRowSpacing - prevBed)
       const newRowSpacing = Math.max(1, newBedWidth + aisle)
       const sections = prev.cropSections?.length
         ? prev.cropSections.map((s, i) => i === 0 ? { ...s, bedWidth: newBedWidth } : s)
@@ -204,9 +208,12 @@ export function CropPlanner() {
     setSaved(false)
     setEditedPlan(prev => {
       if (!prev) return prev
+      const prevBed = Number.isFinite(prev.cropSections?.[0]?.bedWidth)
+        ? prev.cropSections![0].bedWidth
+        : (Number.isFinite(prev.bedWidth) ? prev.bedWidth : 18)
       const safeAisle = Math.max(0, newAisle)
-      const newRowSpacing = Math.max(1, prev.bedWidth + safeAisle)
-      return recalcCounts({ ...prev, rowSpacing: newRowSpacing })
+      const newRowSpacing = Math.max(1, prevBed + safeAisle)
+      return recalcCounts({ ...prev, bedWidth: prevBed, rowSpacing: newRowSpacing })
     })
   }
 
@@ -333,6 +340,16 @@ export function CropPlanner() {
   }
 
   const plan = editedPlan
+
+  // Defensive: derive primary bed from sections (source of truth), fall back to top-level.
+  // Guards against Claude responses missing plan.bedWidth, which would cascade to NaN aisle.
+  const primaryBedWidth = plan
+    ? (Number.isFinite(plan.cropSections?.[0]?.bedWidth)
+        ? plan.cropSections![0].bedWidth
+        : (Number.isFinite(plan.bedWidth) ? plan.bedWidth : 18))
+    : 18
+  const safeRowSpacing = plan && Number.isFinite(plan.rowSpacing) ? plan.rowSpacing : primaryBedWidth + 18
+  const aisleWidth = Math.max(0, safeRowSpacing - primaryBedWidth)
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-6 md:px-6 md:py-8">
@@ -483,8 +500,8 @@ export function CropPlanner() {
                     plotWidth={plan.plotWidth}
                     plotLength={plan.plotLength}
                     spacingInRow={plan.spacingInRow}
-                    rowSpacing={plan.rowSpacing}
-                    bedWidth={plan.bedWidth}
+                    rowSpacing={safeRowSpacing}
+                    bedWidth={primaryBedWidth}
                     cropSections={plan.cropSections}
                   />
                 </div>
@@ -589,12 +606,12 @@ export function CropPlanner() {
                       {isEditing ? (
                         <Input
                           type="number" min={1}
-                          value={plan.bedWidth}
+                          value={primaryBedWidth}
                           onChange={e => updatePrimaryBedWidth(Math.max(1, +e.target.value || 1))}
                           className="h-10 text-base"
                         />
                       ) : (
-                        <p className="text-base font-semibold">{plan.bedWidth}&quot;</p>
+                        <p className="text-base font-semibold">{primaryBedWidth}&quot;</p>
                       )}
                     </CardContent>
                   </Card>
@@ -606,12 +623,12 @@ export function CropPlanner() {
                       {isEditing ? (
                         <Input
                           type="number" min={0}
-                          value={Math.max(0, plan.rowSpacing - plan.bedWidth)}
+                          value={aisleWidth}
                           onChange={e => updateAisle(Math.max(0, +e.target.value || 0))}
                           className="h-10 text-base"
                         />
                       ) : (
-                        <p className="text-base font-semibold">{Math.max(0, plan.rowSpacing - plan.bedWidth)}&quot;</p>
+                        <p className="text-base font-semibold">{aisleWidth}&quot;</p>
                       )}
                     </CardContent>
                   </Card>
@@ -754,7 +771,7 @@ export function CropPlanner() {
                   plotLength={p.plan.plotLength}
                   spacingInRow={p.plan.spacingInRow}
                   rowSpacing={p.plan.rowSpacing}
-                  bedWidth={p.plan.bedWidth}
+                  bedWidth={p.plan.cropSections?.[0]?.bedWidth ?? p.plan.bedWidth}
                   cropSections={p.plan.cropSections}
                 />
               </div>
