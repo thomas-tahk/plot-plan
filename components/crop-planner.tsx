@@ -671,11 +671,11 @@ export function CropPlanner() {
                       <div className="space-y-4">
                         {plan.cropSections.map((section, i) => (
                           <div key={i} className="flex items-start gap-3">
-                            <span className="mt-1 w-3 h-3 rounded-full shrink-0" style={{
+                            <span className="mt-1.5 w-4 h-4 rounded-full shrink-0" style={{
                               background: ["#2d6a4f","#8B3A1F","#2d4a8a","#6a3d8a"][i % 4]
                             }} />
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-base">{section.crop}</p>
+                              <p className="font-semibold text-xl">{section.crop}</p>
                               {isEditing ? (
                                 <div className="grid grid-cols-2 gap-2 mt-2">
                                   <div>
@@ -702,17 +702,17 @@ export function CropPlanner() {
                                 </div>
                               ) : (
                                 <>
-                                  <div className="flex gap-6 mt-1 items-baseline">
+                                  <div className="flex gap-8 mt-2 items-baseline">
                                     <div>
-                                      <p className="text-2xl font-bold text-primary leading-none">{section.totalPlants}</p>
-                                      <p className="text-xs text-muted-foreground mt-1">plants · {section.plantsPerRow}/row</p>
+                                      <p className="text-3xl font-bold text-primary leading-none">{section.totalPlants}</p>
+                                      <p className="text-sm text-muted-foreground mt-1">plants · {section.plantsPerRow}/row</p>
                                     </div>
                                     <div>
-                                      <p className="text-2xl font-bold text-primary leading-none">{section.totalYieldEstimate}</p>
-                                      <p className="text-xs text-muted-foreground mt-1">est. yield</p>
+                                      <p className="text-3xl font-bold text-primary leading-none">{section.totalYieldEstimate}</p>
+                                      <p className="text-sm text-muted-foreground mt-1">est. yield</p>
                                     </div>
                                   </div>
-                                  <p className="text-xs text-muted-foreground mt-2">
+                                  <p className="text-sm text-muted-foreground mt-2">
                                     Rows {section.rowStart}–{section.rowEnd} · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
                                   </p>
                                 </>
@@ -956,47 +956,79 @@ export function CropPlanner() {
           )}
 
           {savedPlots.map(p => (
-            <div
-              key={p.id}
-              className="bg-card rounded-2xl ring-1 ring-border p-4 flex items-center gap-4 md:gap-6 max-w-3xl"
-            >
-              {/* Mini plot thumbnail */}
-              <div className="w-28 sm:w-40 md:w-56 shrink-0 rounded-lg overflow-hidden">
-                <PlotVisualizer
-                  plotWidth={p.plan.plotWidth}
-                  plotLength={p.plan.plotLength}
-                  spacingInRow={p.plan.spacingInRow}
-                  rowSpacing={p.plan.rowSpacing}
-                  bedWidth={p.plan.cropSections?.[0]?.bedWidth ?? p.plan.bedWidth}
-                  cropSections={p.plan.cropSections}
-                />
+            <Dialog.Root key={p.id}>
+              <div className="bg-card rounded-2xl ring-1 ring-border p-4 flex items-center gap-4 md:gap-6 max-w-3xl">
+                {/* Mini plot thumbnail with expand trigger */}
+                <div className="w-28 sm:w-40 md:w-56 shrink-0 rounded-lg overflow-hidden relative">
+                  <Dialog.Trigger
+                    className="absolute top-2 right-2 z-10 bg-background/90 hover:bg-background ring-1 ring-border rounded-md px-2 py-1 text-xs font-medium text-foreground flex items-center gap-1 shadow-sm"
+                    aria-label="Expand plot view"
+                  >
+                    <span className="text-sm leading-none">⤢</span>
+                    <span className="hidden sm:inline">Expand</span>
+                  </Dialog.Trigger>
+                  <PlotVisualizer
+                    plotWidth={p.plan.plotWidth}
+                    plotLength={p.plan.plotLength}
+                    spacingInRow={p.plan.spacingInRow}
+                    rowSpacing={p.plan.rowSpacing}
+                    bedWidth={p.plan.cropSections?.[0]?.bedWidth ?? p.plan.bedWidth}
+                    cropSections={p.plan.cropSections}
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-base">{p.crop}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {p.plot_width} × {p.plot_length} ft · {new Date(p.created_at).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {p.plan.totalPlants} plants · {p.plan.totalRows} rows
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    className="h-10 text-base"
+                    onClick={() => loadPlot(p)}
+                  >
+                    View &amp; Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-9 text-sm text-muted-foreground hover:text-destructive"
+                    onClick={() => deletePlot(p.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-base">{p.crop}</p>
-                <p className="text-sm text-muted-foreground">
-                  {p.plot_width} × {p.plot_length} ft · {new Date(p.created_at).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {p.plan.totalPlants} plants · {p.plan.totalRows} rows
-                </p>
-              </div>
-              <div className="flex flex-col gap-2 shrink-0">
-                <Button
-                  variant="outline"
-                  className="h-10 text-base"
-                  onClick={() => loadPlot(p)}
-                >
-                  View &amp; Edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="h-9 text-sm text-muted-foreground hover:text-destructive"
-                  onClick={() => deletePlot(p.id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
+              <Dialog.Portal>
+                <Dialog.Backdrop className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+                <Dialog.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+                  <div className="bg-card rounded-2xl ring-1 ring-border shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-auto p-6 sm:p-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <Dialog.Title className="text-xl font-bold">
+                        {p.plot_width} × {p.plot_length} ft — {p.crop}
+                      </Dialog.Title>
+                      <Dialog.Close
+                        className="text-muted-foreground hover:text-foreground text-2xl leading-none w-10 h-10 flex items-center justify-center rounded-lg hover:bg-muted"
+                        aria-label="Close"
+                      >
+                        ×
+                      </Dialog.Close>
+                    </div>
+                    <PlotVisualizer
+                      plotWidth={p.plan.plotWidth}
+                      plotLength={p.plan.plotLength}
+                      spacingInRow={p.plan.spacingInRow}
+                      rowSpacing={p.plan.rowSpacing}
+                      bedWidth={p.plan.cropSections?.[0]?.bedWidth ?? p.plan.bedWidth}
+                      cropSections={p.plan.cropSections}
+                    />
+                  </div>
+                </Dialog.Popup>
+              </Dialog.Portal>
+            </Dialog.Root>
           ))}
         </div>
       )}
