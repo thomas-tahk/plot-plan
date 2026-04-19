@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { Dialog } from "@base-ui/react/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -130,6 +131,7 @@ export function CropPlanner() {
     aisleWidth: "",
   })
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
   const [editedPlan, setEditedPlan] = useState<CropPlan | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -556,17 +558,51 @@ export function CropPlanner() {
                   {savedPlotId && <Badge variant="outline" className="text-sm px-2.5 py-1">Saved</Badge>}
                 </div>
 
-                {/* Prominent SVG */}
-                <div className="bg-card rounded-2xl ring-1 ring-border p-4">
-                  <PlotVisualizer
-                    plotWidth={plan.plotWidth}
-                    plotLength={plan.plotLength}
-                    spacingInRow={plan.spacingInRow}
-                    rowSpacing={safeRowSpacing}
-                    bedWidth={primaryBedWidth}
-                    cropSections={plan.cropSections}
-                  />
-                </div>
+                {/* Prominent SVG with full-screen expand */}
+                <Dialog.Root>
+                  <div className="bg-card rounded-2xl ring-1 ring-border p-4 relative">
+                    <Dialog.Trigger
+                      className="absolute top-3 right-3 z-10 bg-background/90 hover:bg-background ring-1 ring-border rounded-lg px-3 py-1.5 text-xs font-medium text-foreground flex items-center gap-1.5 shadow-sm"
+                      aria-label="Expand plot view"
+                    >
+                      <span className="text-sm leading-none">⤢</span> Expand
+                    </Dialog.Trigger>
+                    <PlotVisualizer
+                      plotWidth={plan.plotWidth}
+                      plotLength={plan.plotLength}
+                      spacingInRow={plan.spacingInRow}
+                      rowSpacing={safeRowSpacing}
+                      bedWidth={primaryBedWidth}
+                      cropSections={plan.cropSections}
+                    />
+                  </div>
+                  <Dialog.Portal>
+                    <Dialog.Backdrop className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
+                    <Dialog.Popup className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+                      <div className="bg-card rounded-2xl ring-1 ring-border shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-auto p-6 sm:p-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <Dialog.Title className="text-xl font-bold">
+                            {plan.plotWidth} × {plan.plotLength} ft — {(plan.crops ?? [plan.crop]).join(", ")}
+                          </Dialog.Title>
+                          <Dialog.Close
+                            className="text-muted-foreground hover:text-foreground text-2xl leading-none w-10 h-10 flex items-center justify-center rounded-lg hover:bg-muted"
+                            aria-label="Close"
+                          >
+                            ×
+                          </Dialog.Close>
+                        </div>
+                        <PlotVisualizer
+                          plotWidth={plan.plotWidth}
+                          plotLength={plan.plotLength}
+                          spacingInRow={plan.spacingInRow}
+                          rowSpacing={safeRowSpacing}
+                          bedWidth={primaryBedWidth}
+                          cropSections={plan.cropSections}
+                        />
+                      </div>
+                    </Dialog.Popup>
+                  </Dialog.Portal>
+                </Dialog.Root>
 
                 {/* Headline counts */}
                 <div className="bg-card rounded-2xl ring-1 ring-border p-4 flex gap-8 items-center">
@@ -627,10 +663,19 @@ export function CropPlanner() {
                                 </div>
                               ) : (
                                 <>
-                                  <p className="text-sm text-muted-foreground">
-                                    Rows {section.rowStart}–{section.rowEnd} · {section.totalPlants} plants · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
+                                  <div className="flex gap-6 mt-1 items-baseline">
+                                    <div>
+                                      <p className="text-2xl font-bold text-primary leading-none">{section.totalPlants}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">plants · {section.plantsPerRow}/row</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-2xl font-bold text-primary leading-none">{section.totalYieldEstimate}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">est. yield</p>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Rows {section.rowStart}–{section.rowEnd} · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
                                   </p>
-                                  <p className="text-sm text-muted-foreground">{section.totalYieldEstimate}</p>
                                 </>
                               )}
                             </div>
@@ -740,10 +785,27 @@ export function CropPlanner() {
                 </div>
 
                 {/* Growing notes */}
+                {(() => {
+                  const notesVisible = notesOpen || isEditing
+                  return (
                 <Card size="sm">
                   <CardHeader>
-                    <CardTitle className="text-base font-semibold">Growing Notes</CardTitle>
+                    <button
+                      type="button"
+                      onClick={() => setNotesOpen(o => !o)}
+                      disabled={isEditing}
+                      className="flex items-center justify-between w-full text-left disabled:cursor-default"
+                      aria-expanded={notesVisible}
+                    >
+                      <CardTitle className="text-base font-semibold">
+                        Growing Notes <span className="text-sm text-muted-foreground font-normal">({plan.notes.length})</span>
+                      </CardTitle>
+                      {!isEditing && (
+                        <span className={`text-muted-foreground text-lg transition-transform ${notesVisible ? "rotate-90" : ""}`}>›</span>
+                      )}
+                    </button>
                   </CardHeader>
+                  {notesVisible && (
                   <CardContent>
                     <ul className="space-y-3">
                       {plan.notes.map((note, i) => (
@@ -781,7 +843,10 @@ export function CropPlanner() {
                       </button>
                     )}
                   </CardContent>
+                  )}
                 </Card>
+                  )
+                })()}
 
                 {/* Action buttons */}
                 <div className="flex gap-3">
