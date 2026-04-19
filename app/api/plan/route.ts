@@ -67,8 +67,8 @@ const PLAN_TOOL: Anthropic.Tool = {
       yieldPerPlant:      { type: "string", description: "Primary crop yield per plant" },
       totalYieldEstimate: { type: "string", description: "Clean total yield — number + unit only, e.g. '135 lbs'. No citations, no math, no 'based on'." },
       yieldBasis:         { type: "string", description: "Very short source note, max ~40 chars, e.g. 'NM NASS 2025 (13,500 lbs/ac)' or 'typical NM yield'." },
-      waterSchedule:      { type: "string", description: "Watering schedule — note any differences between crops" },
-      plantingWindow:     { type: "string", description: "Planting window — note if crops differ" },
+      waterSchedule:      { type: "string", description: "Watering schedule. MULTI-CROP FORMAT: one short line per crop separated by \\n, e.g. 'Chile: 2x/week drip\\nSquash: 1x/week deep soak'. SINGLE-CROP: one short line. Be concise — under ~120 chars total." },
+      plantingWindow:     { type: "string", description: "Planting window. MULTI-CROP FORMAT: one short line per crop separated by \\n, e.g. 'Chile: transplant mid-May\\nSquash: direct-sow late May'. SINGLE-CROP: one short line. Under ~120 chars total." },
       cropSections: {
         type: "array",
         description: "One entry per crop. Single-crop: one section covering all rows. Multi-crop: one section per crop.",

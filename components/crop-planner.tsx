@@ -741,7 +741,7 @@ export function CropPlanner() {
                   </Card>
                 </div>
 
-                {/* Other stat cards */}
+                {/* Quick stats (3-col) */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {([
                     {
@@ -764,16 +764,6 @@ export function CropPlanner() {
                       view: <p className="text-base font-semibold">{plan.yieldPerPlant}</p>,
                       edit: <Input value={plan.yieldPerPlant} onChange={e => updatePlan("yieldPerPlant", e.target.value)} className="h-10 text-base" />,
                     },
-                    {
-                      label: "Water",
-                      view: <p className="text-base">{plan.waterSchedule}</p>,
-                      edit: <Input value={plan.waterSchedule} onChange={e => updatePlan("waterSchedule", e.target.value)} className="h-10 text-base" />,
-                    },
-                    {
-                      label: "Plant Window",
-                      view: <p className="text-base">{plan.plantingWindow}</p>,
-                      edit: <Input value={plan.plantingWindow} onChange={e => updatePlan("plantingWindow", e.target.value)} className="h-10 text-base" />,
-                    },
                   ]).map(({ label, view, edit }) => (
                     <Card key={label} size="sm">
                       <CardHeader>
@@ -782,6 +772,46 @@ export function CropPlanner() {
                       <CardContent>{isEditing ? edit : view}</CardContent>
                     </Card>
                   ))}
+                </div>
+
+                {/* Water + Plant Window — wider cards, per-crop line-broken */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {([
+                    { label: "Water", key: "waterSchedule" as const, icon: "💧" },
+                    { label: "Plant Window", key: "plantingWindow" as const, icon: "🌱" },
+                  ]).map(({ label, key, icon }) => {
+                    const lines = (plan[key] ?? "").split("\n").map(l => l.trim()).filter(Boolean)
+                    return (
+                      <Card key={label} size="sm">
+                        <CardHeader>
+                          <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                            <span aria-hidden>{icon}</span> {label}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {isEditing ? (
+                            <textarea
+                              value={plan[key]}
+                              onChange={e => updatePlan(key, e.target.value)}
+                              rows={Math.max(2, lines.length)}
+                              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-base leading-snug resize-y"
+                            />
+                          ) : lines.length > 1 ? (
+                            <ul className="space-y-1.5">
+                              {lines.map((line, i) => (
+                                <li key={i} className="text-base leading-snug flex gap-2">
+                                  <span className="text-muted-foreground mt-0.5">•</span>
+                                  <span>{line}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-base leading-snug">{plan[key]}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
                 </div>
 
                 {/* Growing notes */}
