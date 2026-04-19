@@ -958,10 +958,10 @@ export function CropPlanner() {
           {savedPlots.map(p => (
             <div
               key={p.id}
-              className="bg-card rounded-2xl ring-1 ring-border p-4 flex items-center gap-4"
+              className="bg-card rounded-2xl ring-1 ring-border p-4 flex items-center gap-4 md:gap-6 max-w-3xl"
             >
               {/* Mini plot thumbnail */}
-              <div className="w-24 shrink-0 rounded-lg overflow-hidden">
+              <div className="w-28 sm:w-40 md:w-56 shrink-0 rounded-lg overflow-hidden">
                 <PlotVisualizer
                   plotWidth={p.plan.plotWidth}
                   plotLength={p.plan.plotLength}
