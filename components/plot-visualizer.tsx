@@ -18,14 +18,23 @@ export function PlotVisualizer({ plotWidth, plotLength, spacingInRow, rowSpacing
   const spacingXpx = spacingInRow * PX_PER_IN
   const spacingYpx = rowSpacing * PX_PER_IN
 
-  const plants: { x: number; y: number }[] = []
+  // Row centers and bed height (55% of row spacing = growing strip, 45% = walkway)
+  const bedHeightPx = spacingYpx * 0.55
+  const rowYs: number[] = []
   for (let y = spacingYpx / 2; y < plotH - 0.5; y += spacingYpx) {
+    rowYs.push(y)
+  }
+
+  const plants: { x: number; y: number }[] = []
+  for (const ry of rowYs) {
     for (let x = spacingXpx / 2; x < plotW - 0.5; x += spacingXpx) {
-      plants.push({ x: PAD + x, y: PAD + y })
+      plants.push({ x: PAD + x, y: PAD + ry })
     }
   }
 
-  const plantsPerRow = plants.filter(p => Math.abs(p.y - plants[0]?.y) < 1).length
+  const plantsPerRow = rowYs.length > 0
+    ? plants.filter(p => Math.abs(p.y - (PAD + rowYs[0])) < 1).length
+    : 0
 
   return (
     <svg
@@ -33,20 +42,21 @@ export function PlotVisualizer({ plotWidth, plotLength, spacingInRow, rowSpacing
       className="w-full h-auto"
       aria-label={`Top-down plot: ${plotWidth}ft wide by ${plotLength}ft long`}
     >
-      {/* Soil background */}
-      <rect x={PAD} y={PAD} width={plotW} height={plotH} fill="#c9a96e" rx={3} />
+      {/* Walkway background */}
+      <rect x={PAD} y={PAD} width={plotW} height={plotH} fill="#9e7850" rx={3} />
 
-      {/* Row guides */}
-      {plants
-        .filter((_, i) => i % plantsPerRow === 0)
-        .map((p, i) => (
-          <line
-            key={i}
-            x1={PAD} y1={p.y}
-            x2={PAD + plotW} y2={p.y}
-            stroke="#b08a55" strokeWidth={0.7} strokeDasharray="3 4"
-          />
-        ))}
+      {/* Bed strips (growing area) */}
+      {rowYs.map((ry, i) => (
+        <rect
+          key={i}
+          x={PAD}
+          y={PAD + ry - bedHeightPx / 2}
+          width={plotW}
+          height={bedHeightPx}
+          fill="#c9a96e"
+          rx={2}
+        />
+      ))}
 
       {/* Plants */}
       {plants.map((p, i) => (
@@ -76,24 +86,37 @@ export function PlotVisualizer({ plotWidth, plotLength, spacingInRow, rowSpacing
         </g>
       )}
 
-      {/* Row spacing annotation (right side) */}
-      {plantsPerRow > 0 && plants.length > plantsPerRow && (
+      {/* Row spacing annotation — shows bed + walkway width on right side */}
+      {rowYs.length >= 2 && (
         <g>
           <line
-            x1={PAD + plotW - 6} y1={plants[0].y}
-            x2={PAD + plotW - 6} y2={plants[plantsPerRow].y}
+            x1={PAD + plotW - 6} y1={PAD + rowYs[0]}
+            x2={PAD + plotW - 6} y2={PAD + rowYs[1]}
             stroke="#c0562a" strokeWidth={1}
           />
-          <line x1={PAD + plotW - 9} y1={plants[0].y} x2={PAD + plotW - 3} y2={plants[0].y} stroke="#c0562a" strokeWidth={1} />
-          <line x1={PAD + plotW - 9} y1={plants[plantsPerRow].y} x2={PAD + plotW - 3} y2={plants[plantsPerRow].y} stroke="#c0562a" strokeWidth={1} />
+          <line x1={PAD + plotW - 9} y1={PAD + rowYs[0]} x2={PAD + plotW - 3} y2={PAD + rowYs[0]} stroke="#c0562a" strokeWidth={1} />
+          <line x1={PAD + plotW - 9} y1={PAD + rowYs[1]} x2={PAD + plotW - 3} y2={PAD + rowYs[1]} stroke="#c0562a" strokeWidth={1} />
           <text
             x={PAD + plotW + 6}
-            y={(plants[0].y + plants[plantsPerRow].y) / 2 + 3}
+            y={(PAD + rowYs[0] + PAD + rowYs[1]) / 2 + 3}
             textAnchor="start" fontSize={8} fill="#c0562a"
           >
             {rowSpacing}&quot;
           </text>
         </g>
+      )}
+
+      {/* Bed label */}
+      {rowYs.length > 0 && (
+        <text
+          x={PAD + 4}
+          y={PAD + rowYs[0] + 4}
+          fontSize={7}
+          fill="#6b4c28"
+          fontWeight="600"
+        >
+          bed
+        </text>
       )}
 
       {/* Width dimension */}

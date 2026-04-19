@@ -28,6 +28,8 @@ type CropPlan = {
   plotLength: number
   spacingInRow: number
   rowSpacing: number
+  plantsPerRow: number
+  totalRows: number
   totalPlants: number
   plantingDepth: string
   daysToHarvest: number
@@ -55,6 +57,8 @@ const MOCK_PLAN: CropPlan = {
   plotLength: 30,
   spacingInRow: 18,
   rowSpacing: 24,
+  plantsPerRow: 13,
+  totalRows: 15,
   totalPlants: 195,
   plantingDepth: "¼\" seeds · 4–6\" transplants",
   daysToHarvest: 75,
@@ -323,7 +327,12 @@ export function CropPlanner() {
                     <div className="flex-1 flex flex-col justify-center gap-4 py-2">
                       <div>
                         <p className="text-4xl font-bold text-primary">{plan.totalPlants}</p>
-                        <p className="text-base text-muted-foreground">plants in this plot</p>
+                        <p className="text-base text-muted-foreground">plants total</p>
+                        {plan.totalRows > 0 && plan.plantsPerRow > 0 && (
+                          <p className="text-sm font-semibold text-foreground mt-1">
+                            {plan.totalRows} rows · {plan.plantsPerRow} plants/row
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{plan.totalYieldEstimate}</p>
