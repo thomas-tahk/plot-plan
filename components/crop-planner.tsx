@@ -132,6 +132,15 @@ export function CropPlanner() {
   })
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [notesOpen, setNotesOpen] = useState(false)
+  const [layoutMode, setLayoutMode] = useState<"side" | "stacked">("side")
+
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem("plotplan.layout") : null
+    if (saved === "side" || saved === "stacked") setLayoutMode(saved)
+  }, [])
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem("plotplan.layout", layoutMode)
+  }, [layoutMode])
   const [editedPlan, setEditedPlan] = useState<CropPlan | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -368,26 +377,54 @@ export function CropPlanner() {
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4 py-6 md:px-6 md:py-8">
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1 w-fit">
-        {(["planner", "my-plots"] as Tab[]).map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-5 py-2.5 rounded-lg text-base font-medium transition-colors ${
-              tab === t ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t === "planner" ? "Planner" : "My Plots"}
-          </button>
-        ))}
+      {/* Tab bar + layout toggle */}
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+        <div className="flex gap-1 bg-muted rounded-xl p-1 w-fit">
+          {(["planner", "my-plots"] as Tab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-5 py-2.5 rounded-lg text-base font-medium transition-colors ${
+                tab === t ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t === "planner" ? "Planner" : "My Plots"}
+            </button>
+          ))}
+        </div>
+        {tab === "planner" && (
+          <div className="hidden lg:flex gap-1 bg-muted rounded-xl p-1 w-fit" role="group" aria-label="Layout mode">
+            {([
+              { id: "side" as const,    label: "Side-by-side", icon: "◫" },
+              { id: "stacked" as const, label: "Stacked",      icon: "☰" },
+            ]).map(({ id, label, icon }) => (
+              <button
+                key={id}
+                onClick={() => setLayoutMode(id)}
+                aria-pressed={layoutMode === id}
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                  layoutMode === id ? "bg-card shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span aria-hidden className="text-base leading-none">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── PLANNER TAB ── */}
       {tab === "planner" && (
-        <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
+        <div className={layoutMode === "side"
+          ? "flex flex-col lg:flex-row gap-6 lg:gap-10"
+          : "flex flex-col gap-6"
+        }>
           {/* Form */}
-          <div className="lg:w-72 shrink-0 space-y-5">
+          <div className={layoutMode === "side"
+            ? "lg:w-72 shrink-0 space-y-5"
+            : "w-full max-w-2xl mx-auto space-y-5 bg-card rounded-2xl ring-1 ring-border p-5"
+          }>
             <div>
               <h2 className="text-lg font-semibold">Your Plot</h2>
               <p className="text-sm text-muted-foreground mt-1">Enter your details to get a planting plan.</p>
