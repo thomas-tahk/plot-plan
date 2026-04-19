@@ -20,6 +20,13 @@ WATER RIGHTS: Many NM farmers use acequia or well water. Drip irrigation is most
 NATIVE/ADAPTED CROPS: Chile pepper (NM's signature crop), squash, beans, corn (Three Sisters), melons.
 WATER-INTENSIVE CROPS: Alfalfa, cotton, pecans — flag these with a water warning note.
 
+SPACING DEFINITIONS (three distinct measurements):
+- spacingInRow: inches between plants within a single row (e.g., 12" for chile)
+- bedWidth: width of the planted growing strip in inches. Each crop has a standard bed width:
+  Chile 24", Tomato 24", Squash 36", Corn 30", Lettuce 18", Green Beans 18", Pumpkin 48", Cucumber 24", Alfalfa 36"
+- rowSpacing: center-to-center distance between rows in inches. Should equal bedWidth + typical aisle/walkway.
+  Aisle (walkway) = rowSpacing − bedWidth. Typical aisle: 18–24" for row crops.
+
 When calculating plant counts:
 - Use half-spacing margins from all plot edges
 - plantsPerRow = floor((plotWidth * 12 - spacingInRow) / spacingInRow) + 1
@@ -43,7 +50,8 @@ const PLAN_TOOL: Anthropic.Tool = {
     type: "object" as const,
     properties: {
       spacingInRow:       { type: "number", description: "Inches between plants within a row" },
-      rowSpacing:         { type: "number", description: "Inches between rows" },
+      bedWidth:           { type: "number", description: "Width of the planted growing strip/bed in inches (crop-specific, e.g. 24 for chile, 36 for squash)" },
+      rowSpacing:         { type: "number", description: "Center-to-center distance between rows in inches (= bedWidth + aisle width)" },
       plantsPerRow:       { type: "number", description: "Number of plants per row" },
       totalRows:          { type: "number", description: "Total number of rows" },
       totalPlants:        { type: "number", description: "Total plant count for the plot" },
@@ -60,7 +68,7 @@ const PLAN_TOOL: Anthropic.Tool = {
       },
     },
     required: [
-      "spacingInRow", "rowSpacing", "plantsPerRow", "totalRows", "totalPlants",
+      "spacingInRow", "bedWidth", "rowSpacing", "plantsPerRow", "totalRows", "totalPlants",
       "plantingDepth", "daysToHarvest", "yieldPerPlant", "totalYieldEstimate",
       "waterSchedule", "plantingWindow", "notes",
     ],
