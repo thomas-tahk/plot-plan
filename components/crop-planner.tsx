@@ -13,8 +13,20 @@ import { PlotVisualizer } from "@/components/plot-visualizer"
 import { supabase } from "@/lib/supabase"
 import { getSessionId } from "@/lib/session"
 
+type CropSection = {
+  crop: string
+  rowStart: number
+  rowEnd: number
+  spacingInRow: number
+  bedWidth: number
+  plantsPerRow: number
+  totalPlants: number
+  totalYieldEstimate: string
+}
+
 type CropPlan = {
   crop: string
+  crops: string[]
   region: string
   plotWidth: number
   plotLength: number
@@ -30,13 +42,14 @@ type CropPlan = {
   totalYieldEstimate: string
   waterSchedule: string
   plantingWindow: string
+  cropSections: CropSection[]
   notes: string[]
 }
 
 type FormData = {
   plotWidth: string
   plotLength: string
-  crop: string
+  crops: string[]
   region: string
   irrigation: string
 }
@@ -74,7 +87,7 @@ export function CropPlanner() {
   const [form, setForm] = useState<FormData>({
     plotWidth: "20",
     plotLength: "30",
-    crop: "Chile Pepper (Hatch)",
+    crops: ["Chile Pepper (Hatch)"],
     region: "Bernalillo County",
     irrigation: "Drip",
   })
@@ -99,7 +112,7 @@ export function CropPlanner() {
         body: JSON.stringify({
           plotWidth: Number(form.plotWidth),
           plotLength: Number(form.plotLength),
-          crop: form.crop,
+          crops: form.crops,
           region: form.region,
           irrigation: form.irrigation,
         }),
@@ -246,14 +259,58 @@ export function CropPlanner() {
               ))}
             </div>
 
+            {/* Crops — multi-select list */}
+            <div className="space-y-2">
+              <Label className="text-base font-medium">Crops</Label>
+              <div className="space-y-2">
+                {form.crops.map((crop, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Select
+                      value={crop}
+                      onValueChange={v => { if (!v) return; setForm(f => {
+                        const crops = [...f.crops]
+                        crops[i] = v
+                        return { ...f, crops }
+                      }) }}
+                    >
+                      <SelectTrigger className="flex-1 h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CROPS.map(o => (
+                          <SelectItem key={o} value={o} className="text-base py-3">{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form.crops.length > 1 && (
+                      <button
+                        onClick={() => setForm(f => ({ ...f, crops: f.crops.filter((_, idx) => idx !== i) }))}
+                        className="text-muted-foreground hover:text-foreground text-xl leading-none shrink-0 w-8 h-8 flex items-center justify-center"
+                        aria-label="Remove crop"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {form.crops.length < 4 && (
+                  <button
+                    onClick={() => setForm(f => ({ ...f, crops: [...f.crops, CROPS.find(c => !f.crops.includes(c)) ?? CROPS[1]] }))}
+                    className="text-sm text-primary font-medium hover:underline"
+                  >
+                    + Add another crop
+                  </button>
+                )}
+              </div>
+            </div>
+
             {([
-              { label: "Crop", key: "crop" as const, options: CROPS },
               { label: "Region", key: "region" as const, options: REGIONS },
               { label: "Irrigation", key: "irrigation" as const, options: IRRIGATION_TYPES },
             ]).map(({ label, key, options }) => (
               <div key={key} className="space-y-2">
                 <Label className="text-base font-medium">{label}</Label>
-                <Select value={form[key]} onValueChange={v => setForm(f => ({ ...f, [key]: v }))}>
+                <Select value={form[key] as string} onValueChange={v => setForm(f => ({ ...f, [key]: v }))}>
                   <SelectTrigger className="w-full h-12 text-base">
                     <SelectValue />
                   </SelectTrigger>
@@ -291,7 +348,7 @@ export function CropPlanner() {
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-bold">
-                    {plan.plotWidth} × {plan.plotLength} ft — {plan.crop}
+                    {plan.plotWidth} × {plan.plotLength} ft — {(plan.crops ?? [plan.crop]).join(", ")}
                   </h2>
                   <Badge className="text-sm px-2.5 py-1">{plan.region}</Badge>
                   {savedPlotId && <Badge variant="outline" className="text-sm px-2.5 py-1">Saved</Badge>}
@@ -305,6 +362,7 @@ export function CropPlanner() {
                     spacingInRow={plan.spacingInRow}
                     rowSpacing={plan.rowSpacing}
                     bedWidth={plan.bedWidth}
+                    cropSections={plan.cropSections}
                   />
                 </div>
 
@@ -322,6 +380,33 @@ export function CropPlanner() {
                     <p className="text-sm text-muted-foreground">estimated total yield</p>
                   </div>
                 </div>
+
+                {/* Crop sections breakdown (multi-crop only) */}
+                {plan.cropSections && plan.cropSections.length > 1 && (
+                  <Card size="sm">
+                    <CardHeader>
+                      <CardTitle className="text-base font-semibold">Crop Sections</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {plan.cropSections.map((section, i) => (
+                          <div key={i} className="flex items-start gap-3">
+                            <span className="mt-1 w-3 h-3 rounded-full shrink-0" style={{
+                              background: ["#2d6a4f","#8B3A1F","#2d4a8a","#6a3d8a"][i % 4]
+                            }} />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-base">{section.crop}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Rows {section.rowStart}–{section.rowEnd} · {section.totalPlants} plants · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
+                              </p>
+                              <p className="text-sm text-muted-foreground">{section.totalYieldEstimate}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Spacing details */}
                 <div className="grid grid-cols-3 gap-3">
@@ -519,6 +604,7 @@ export function CropPlanner() {
                   spacingInRow={p.plan.spacingInRow}
                   rowSpacing={p.plan.rowSpacing}
                   bedWidth={p.plan.bedWidth}
+                  cropSections={p.plan.cropSections}
                 />
               </div>
               <div className="flex-1 min-w-0">

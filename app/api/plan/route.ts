@@ -27,19 +27,20 @@ SPACING DEFINITIONS (three distinct measurements):
 - rowSpacing: center-to-center distance between rows in inches. Should equal bedWidth + typical aisle/walkway.
   Aisle (walkway) = rowSpacing − bedWidth. Typical aisle: 18–24" for row crops.
 
-When calculating plant counts:
-- Use half-spacing margins from all plot edges
+SINGLE-CROP plant count formulas:
 - plantsPerRow = floor((plotWidth * 12 - spacingInRow) / spacingInRow) + 1
 - totalRows = floor((plotLength * 12 - rowSpacing) / rowSpacing) + 1
 - totalPlants = plantsPerRow * totalRows
 
-When USDA NASS yield data is provided, use it to anchor your yield estimate for the plot:
-- Plot acres = (plotWidth × plotLength) / 43560
-- Expected yield = plot acres × NASS lbs/acre
-- Use this as your midpoint — adjust ±20% for small-plot vs commercial scale differences
-- Cite the NASS source in your totalYieldEstimate string, e.g. "~186 lbs (based on USDA NASS 2025 NM avg)"
+MULTI-CROP plots:
+- Divide total rows proportionally and agronomically between crops
+- Use a single consistent rowSpacing for the whole plot (use the largest rowSpacing needed)
+- Fill cropSections: one entry per crop with its row range, spacing, and yield
+- totalRows and totalPlants are sums across all sections
+- Notes should address all crops — compatibility, companion planting tips, water needs
 
-Always include a note about row count (e.g. "15 rows of 13 plants each") as farmers often think in rows.
+When USDA NASS yield data is provided, use it to anchor yield estimates.
+Always include a note about row count (e.g. "15 rows of 13 plants each") as farmers think in rows.
 Always tailor advice to the specific region's frost dates, water situation, and soil.
 Keep notes practical and actionable — no jargon.`
 
@@ -49,57 +50,87 @@ const PLAN_TOOL: Anthropic.Tool = {
   input_schema: {
     type: "object" as const,
     properties: {
-      spacingInRow:       { type: "number", description: "Inches between plants within a row" },
-      bedWidth:           { type: "number", description: "Width of the planted growing strip/bed in inches (crop-specific, e.g. 24 for chile, 36 for squash)" },
-      rowSpacing:         { type: "number", description: "Center-to-center distance between rows in inches (= bedWidth + aisle width)" },
-      plantsPerRow:       { type: "number", description: "Number of plants per row" },
-      totalRows:          { type: "number", description: "Total number of rows" },
-      totalPlants:        { type: "number", description: "Total plant count for the plot" },
-      plantingDepth:      { type: "string", description: "Planting depth, e.g. '¼\" seeds · 4–6\" transplants'" },
-      daysToHarvest:      { type: "number", description: "Days from transplant to first harvest" },
-      yieldPerPlant:      { type: "string", description: "Expected yield per plant, e.g. '2–4 lbs'" },
-      totalYieldEstimate: { type: "string", description: "Total estimated yield. If NASS data was provided, cite it." },
-      waterSchedule:      { type: "string", description: "Watering frequency and amount" },
-      plantingWindow:     { type: "string", description: "When to start/transplant, specific to the region" },
+      spacingInRow:       { type: "number", description: "Primary crop: inches between plants within a row" },
+      bedWidth:           { type: "number", description: "Primary crop: growing strip width in inches" },
+      rowSpacing:         { type: "number", description: "Consistent center-to-center row spacing for the whole plot in inches" },
+      plantsPerRow:       { type: "number", description: "Primary crop: plants per row" },
+      totalRows:          { type: "number", description: "Total rows across all crops" },
+      totalPlants:        { type: "number", description: "Total plants across all crops" },
+      plantingDepth:      { type: "string", description: "Primary crop planting depth" },
+      daysToHarvest:      { type: "number", description: "Primary crop days from transplant to first harvest" },
+      yieldPerPlant:      { type: "string", description: "Primary crop yield per plant" },
+      totalYieldEstimate: { type: "string", description: "Combined total yield estimate for the plot. Cite NASS source if provided." },
+      waterSchedule:      { type: "string", description: "Watering schedule — note any differences between crops" },
+      plantingWindow:     { type: "string", description: "Planting window — note if crops differ" },
+      cropSections: {
+        type: "array",
+        description: "One entry per crop. Single-crop: one section covering all rows. Multi-crop: one section per crop.",
+        items: {
+          type: "object",
+          properties: {
+            crop:             { type: "string" },
+            rowStart:         { type: "number", description: "First row number, 1-indexed" },
+            rowEnd:           { type: "number", description: "Last row number, 1-indexed" },
+            spacingInRow:     { type: "number" },
+            bedWidth:         { type: "number" },
+            plantsPerRow:     { type: "number" },
+            totalPlants:      { type: "number" },
+            totalYieldEstimate: { type: "string" },
+          },
+          required: ["crop","rowStart","rowEnd","spacingInRow","bedWidth","plantsPerRow","totalPlants","totalYieldEstimate"],
+        },
+      },
       notes: {
         type: "array",
         items: { type: "string" },
-        description: "5–7 practical notes for NM conditions. First note must state row count and plants per row.",
+        description: "5–7 practical notes. First note must state row layout (e.g. '8 rows chile + 4 rows squash, 13 plants/row'). Address all crops.",
       },
     },
     required: [
       "spacingInRow", "bedWidth", "rowSpacing", "plantsPerRow", "totalRows", "totalPlants",
       "plantingDepth", "daysToHarvest", "yieldPerPlant", "totalYieldEstimate",
-      "waterSchedule", "plantingWindow", "notes",
+      "waterSchedule", "plantingWindow", "cropSections", "notes",
     ],
   },
 }
 
 export async function POST(req: Request) {
-  const { plotWidth, plotLength, crop, region, irrigation } = await req.json()
+  const { plotWidth, plotLength, crops, region, irrigation } = await req.json()
+  const cropList: string[] = Array.isArray(crops) ? crops : [crops]
+  const primaryCrop = cropList[0]
+  const isMultiCrop = cropList.length > 1
 
-  // Fetch real NASS yield data for NM if available for this crop
-  const nassYield = await fetchNMCropYield(crop)
   const plotAcres = (plotWidth * plotLength) / 43560
-  const nassContext = nassYield
-    ? `\nUSDA NASS REAL DATA for ${crop} in NM (${nassYield.source}):
-- State average yield: ${nassYield.lbsPerAcre.toLocaleString()} lbs/acre
-- This plot (${plotWidth}×${plotLength} ft = ${plotAcres.toFixed(4)} acres): ~${Math.round(plotAcres * nassYield.lbsPerAcre).toLocaleString()} lbs expected at commercial scale
-- Use this as your yield anchor. Cite "${nassYield.source}" in totalYieldEstimate.`
-    : `\nNo NM-specific USDA NASS yield data available for ${crop} — use best agricultural knowledge.`
+
+  // Fetch NASS yield data for all crops in parallel
+  const nassResults = await Promise.all(cropList.map(c => fetchNMCropYield(c)))
+  const nassContext = cropList.map((crop, i) => {
+    const n = nassResults[i]
+    return n
+      ? `${crop}: ${n.lbsPerAcre.toLocaleString()} lbs/acre (${n.source})`
+      : `${crop}: no NM NASS data — use best knowledge`
+  }).join("\n")
+
+  const cropLine = isMultiCrop
+    ? `Crops (intercropped by row): ${cropList.join(", ")}`
+    : `Crop: ${primaryCrop}`
 
   const userPrompt = `Generate a planting plan for:
-- Crop: ${crop}
+- ${cropLine}
 - Plot: ${plotWidth} ft wide × ${plotLength} ft long
 - Region: ${region}
 - Irrigation: ${irrigation}
-${nassContext}
 
-Calculate exact plant counts using the plot dimensions. Tailor all timing and water advice to ${region}.`
+USDA NASS NM yield data:
+${nassContext}
+Plot size: ${plotAcres.toFixed(4)} acres
+
+${isMultiCrop ? `Divide the plot rows agronomically between the ${cropList.length} crops. Use one consistent rowSpacing for the whole plot.` : ""}
+Calculate exact plant counts. Tailor all timing and water advice to ${region}.`
 
   const response = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 1024,
+    max_tokens: 1500,
     system: SYSTEM_PROMPT,
     tools: [PLAN_TOOL],
     tool_choice: { type: "tool", name: "generate_crop_plan" },
@@ -112,12 +143,12 @@ Calculate exact plant counts using the plot dimensions. Tailor all timing and wa
   }
 
   return Response.json({
-    crop,
+    crop: primaryCrop,
+    crops: cropList,
     region,
     plotWidth,
     plotLength,
     irrigation,
-    nassSource: nassYield?.source ?? null,
     ...(toolUse.input as Record<string, unknown>),
   })
 }
