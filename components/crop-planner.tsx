@@ -74,10 +74,40 @@ const REGIONS = [
 ]
 const IRRIGATION_TYPES = ["Drip", "Flood", "Sprinkler", "None (rain-fed)"]
 
+function sectionPlantsPerRow(plotWidth: number, spacingInRow: number): number {
+  return Math.max(1, Math.floor((plotWidth * 12 - spacingInRow) / spacingInRow) + 1)
+}
+
 function recalcCounts(plan: CropPlan): CropPlan {
-  const plantsPerRow = Math.max(1, Math.floor((plan.plotWidth * 12 - plan.spacingInRow) / plan.spacingInRow) + 1)
+  const plantsPerRow = sectionPlantsPerRow(plan.plotWidth, plan.spacingInRow)
   const totalRows = Math.max(1, Math.floor((plan.plotLength * 12 - plan.rowSpacing) / plan.rowSpacing) + 1)
-  return { ...plan, plantsPerRow, totalRows, totalPlants: plantsPerRow * totalRows }
+
+  // Rescale cropSections to match new totalRows, preserving the original proportions
+  let cropSections = plan.cropSections ?? []
+  if (cropSections.length === 1) {
+    const s = cropSections[0]
+    const secPPR = sectionPlantsPerRow(plan.plotWidth, s.spacingInRow)
+    cropSections = [{ ...s, rowStart: 1, rowEnd: totalRows, plantsPerRow: secPPR, totalPlants: secPPR * totalRows }]
+  } else if (cropSections.length > 1) {
+    const oldTotalRows = cropSections.reduce((m, s) => Math.max(m, s.rowEnd), 0) || totalRows
+    let cursor = 1
+    cropSections = cropSections.map((s, i) => {
+      const oldRowCount = s.rowEnd - s.rowStart + 1
+      const scaled = Math.max(1, Math.round((oldRowCount / oldTotalRows) * totalRows))
+      const start = cursor
+      const end = i === cropSections.length - 1 ? totalRows : Math.min(totalRows, cursor + scaled - 1)
+      cursor = end + 1
+      const secPPR = sectionPlantsPerRow(plan.plotWidth, s.spacingInRow)
+      const rowCount = end - start + 1
+      return { ...s, rowStart: start, rowEnd: end, plantsPerRow: secPPR, totalPlants: secPPR * rowCount }
+    })
+  }
+
+  const totalPlants = cropSections.length > 0
+    ? cropSections.reduce((sum, s) => sum + s.totalPlants, 0)
+    : plantsPerRow * totalRows
+
+  return { ...plan, plantsPerRow, totalRows, totalPlants, cropSections }
 }
 
 type Tab = "planner" | "my-plots"
@@ -101,6 +131,16 @@ export function CropPlanner() {
   const [loadingPlots, setLoadingPlots] = useState(false)
 
   async function handleGenerate() {
+    const width = Number(form.plotWidth)
+    const length = Number(form.plotLength)
+    if (!Number.isFinite(width) || width < 1 || !Number.isFinite(length) || length < 1) {
+      alert("Please enter plot width and length (both at least 1 ft).")
+      return
+    }
+    if (form.crops.length === 0) {
+      alert("Please pick at least one crop.")
+      return
+    }
     setLoading(true)
     setSaved(false)
     setSavedPlotId(null)
@@ -110,8 +150,8 @@ export function CropPlanner() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          plotWidth: Number(form.plotWidth),
-          plotLength: Number(form.plotLength),
+          plotWidth: width,
+          plotLength: length,
           crops: form.crops,
           region: form.region,
           irrigation: form.irrigation,
@@ -129,11 +169,68 @@ export function CropPlanner() {
 
   function updatePlan<K extends keyof CropPlan>(key: K, value: CropPlan[K]) {
     setSaved(false)
+    setEditedPlan(prev => prev ? { ...prev, [key]: value } : prev)
+  }
+
+  // Primary-crop spacing edit: also mirrors into cropSections[0]
+  function updatePrimarySpacing(newSpacing: number) {
+    setSaved(false)
     setEditedPlan(prev => {
       if (!prev) return prev
-      const next = { ...prev, [key]: value }
-      if (key === "spacingInRow" || key === "rowSpacing") return recalcCounts(next)
-      return next
+      const sections = prev.cropSections?.length
+        ? prev.cropSections.map((s, i) => i === 0 ? { ...s, spacingInRow: newSpacing } : s)
+        : prev.cropSections
+      return recalcCounts({ ...prev, spacingInRow: newSpacing, cropSections: sections })
+    })
+  }
+
+  // Bed width edit: keeps current aisle constant, so rowSpacing shifts with it.
+  function updatePrimaryBedWidth(newBedWidth: number) {
+    setSaved(false)
+    setEditedPlan(prev => {
+      if (!prev) return prev
+      const aisle = Math.max(0, prev.rowSpacing - prev.bedWidth)
+      const newRowSpacing = Math.max(1, newBedWidth + aisle)
+      const sections = prev.cropSections?.length
+        ? prev.cropSections.map((s, i) => i === 0 ? { ...s, bedWidth: newBedWidth } : s)
+        : prev.cropSections
+      return recalcCounts({ ...prev, bedWidth: newBedWidth, rowSpacing: newRowSpacing, cropSections: sections })
+    })
+  }
+
+  // Aisle is a virtual field — rowSpacing = bedWidth + aisle.
+  function updateAisle(newAisle: number) {
+    setSaved(false)
+    setEditedPlan(prev => {
+      if (!prev) return prev
+      const safeAisle = Math.max(0, newAisle)
+      const newRowSpacing = Math.max(1, prev.bedWidth + safeAisle)
+      return recalcCounts({ ...prev, rowSpacing: newRowSpacing })
+    })
+  }
+
+  // Per-section editing for multi-crop plans
+  function updateSection(i: number, patch: Partial<CropSection>) {
+    setSaved(false)
+    setEditedPlan(prev => {
+      if (!prev || !prev.cropSections) return prev
+      const nextSections = prev.cropSections.map((s, idx) => idx === i ? { ...s, ...patch } : s)
+      // Recompute per-section plantsPerRow + totalPlants with current spacing
+      const recomputed = nextSections.map(s => {
+        const ppr = sectionPlantsPerRow(prev.plotWidth, s.spacingInRow)
+        const rowCount = Math.max(1, s.rowEnd - s.rowStart + 1)
+        return { ...s, plantsPerRow: ppr, totalPlants: ppr * rowCount }
+      })
+      const totalPlants = recomputed.reduce((sum, s) => sum + s.totalPlants, 0)
+      const primary = recomputed[0]
+      return {
+        ...prev,
+        cropSections: recomputed,
+        spacingInRow: primary.spacingInRow,
+        bedWidth: primary.bedWidth,
+        plantsPerRow: primary.plantsPerRow,
+        totalPlants,
+      }
     })
   }
 
@@ -167,23 +264,46 @@ export function CropPlanner() {
     if (!editedPlan || saving) return
     setSaving(true)
     const sessionId = getSessionId()
-    if (savedPlotId) {
-      await supabase.from("plots").update({ plan: editedPlan, crop: editedPlan.crop }).eq("id", savedPlotId)
-    } else {
-      const { data } = await supabase.from("plots").insert({
-        session_id: sessionId,
-        crop: editedPlan.crop,
-        region: editedPlan.region,
-        plot_width: editedPlan.plotWidth,
-        plot_length: editedPlan.plotLength,
-        irrigation: form.irrigation,
-        plan: editedPlan,
-      }).select("id").single()
-      if (data) setSavedPlotId(data.id)
+    const clean: CropPlan = { ...editedPlan, notes: editedPlan.notes.map(n => n.trim()).filter(Boolean) }
+    try {
+      if (savedPlotId) {
+        const { error } = await supabase.from("plots").update({ plan: clean, crop: clean.crop }).eq("id", savedPlotId)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from("plots").insert({
+          session_id: sessionId,
+          crop: clean.crop,
+          region: clean.region,
+          plot_width: clean.plotWidth,
+          plot_length: clean.plotLength,
+          irrigation: form.irrigation,
+          plan: clean,
+        }).select("id").single()
+        if (error) throw error
+        if (data) setSavedPlotId(data.id)
+      }
+      setEditedPlan(clean)
+      setSaved(true)
+      setIsEditing(false)
+    } catch {
+      alert("Couldn't save your plan. Please try again.")
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    setSaved(true)
-    setIsEditing(false)
+    fetchPlots()
+  }
+
+  async function deletePlot(id: string) {
+    if (!confirm("Delete this saved plan?")) return
+    const { error } = await supabase.from("plots").delete().eq("id", id)
+    if (error) {
+      alert("Couldn't delete the plan. Please try again.")
+      return
+    }
+    if (savedPlotId === id) {
+      setSavedPlotId(null)
+      setSaved(false)
+    }
     fetchPlots()
   }
 
@@ -277,9 +397,11 @@ export function CropPlanner() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CROPS.map(o => (
-                          <SelectItem key={o} value={o} className="text-base py-3">{o}</SelectItem>
-                        ))}
+                        {CROPS
+                          .filter(o => o === crop || !form.crops.includes(o))
+                          .map(o => (
+                            <SelectItem key={o} value={o} className="text-base py-3">{o}</SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     {form.crops.length > 1 && (
@@ -388,7 +510,7 @@ export function CropPlanner() {
                       <CardTitle className="text-base font-semibold">Crop Sections</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {plan.cropSections.map((section, i) => (
                           <div key={i} className="flex items-start gap-3">
                             <span className="mt-1 w-3 h-3 rounded-full shrink-0" style={{
@@ -396,10 +518,38 @@ export function CropPlanner() {
                             }} />
                             <div className="flex-1 min-w-0">
                               <p className="font-semibold text-base">{section.crop}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Rows {section.rowStart}–{section.rowEnd} · {section.totalPlants} plants · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
-                              </p>
-                              <p className="text-sm text-muted-foreground">{section.totalYieldEstimate}</p>
+                              {isEditing ? (
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Spacing (in)</Label>
+                                    <Input
+                                      type="number" min={1}
+                                      value={section.spacingInRow}
+                                      onChange={e => updateSection(i, { spacingInRow: Math.max(1, +e.target.value || 1) })}
+                                      className="h-9 text-sm"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Bed width (in)</Label>
+                                    <Input
+                                      type="number" min={1}
+                                      value={section.bedWidth}
+                                      onChange={e => updateSection(i, { bedWidth: Math.max(1, +e.target.value || 1) })}
+                                      className="h-9 text-sm"
+                                    />
+                                  </div>
+                                  <p className="col-span-2 text-xs text-muted-foreground">
+                                    Rows {section.rowStart}–{section.rowEnd} · {section.totalPlants} plants · {section.totalYieldEstimate}
+                                  </p>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-sm text-muted-foreground">
+                                    Rows {section.rowStart}–{section.rowEnd} · {section.totalPlants} plants · {section.spacingInRow}&quot; spacing · {section.bedWidth}&quot; bed
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">{section.totalYieldEstimate}</p>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -408,7 +558,7 @@ export function CropPlanner() {
                   </Card>
                 )}
 
-                {/* Spacing details */}
+                {/* Spacing details (primary crop) */}
                 <div className="grid grid-cols-3 gap-3">
                   <Card size="sm">
                     <CardHeader>
@@ -419,7 +569,7 @@ export function CropPlanner() {
                         <Input
                           type="number" min={1}
                           value={plan.spacingInRow}
-                          onChange={e => updatePlan("spacingInRow", +e.target.value)}
+                          onChange={e => updatePrimarySpacing(Math.max(1, +e.target.value || 1))}
                           className="h-10 text-base"
                         />
                       ) : (
@@ -436,7 +586,7 @@ export function CropPlanner() {
                         <Input
                           type="number" min={1}
                           value={plan.bedWidth}
-                          onChange={e => updatePlan("bedWidth", +e.target.value)}
+                          onChange={e => updatePrimaryBedWidth(Math.max(1, +e.target.value || 1))}
                           className="h-10 text-base"
                         />
                       ) : (
@@ -451,16 +601,13 @@ export function CropPlanner() {
                     <CardContent>
                       {isEditing ? (
                         <Input
-                          type="number" min={1}
-                          value={plan.rowSpacing}
-                          onChange={e => updatePlan("rowSpacing", +e.target.value)}
+                          type="number" min={0}
+                          value={Math.max(0, plan.rowSpacing - plan.bedWidth)}
+                          onChange={e => updateAisle(Math.max(0, +e.target.value || 0))}
                           className="h-10 text-base"
                         />
                       ) : (
                         <p className="text-base font-semibold">{Math.max(0, plan.rowSpacing - plan.bedWidth)}&quot;</p>
-                      )}
-                      {isEditing && (
-                        <p className="text-xs text-muted-foreground mt-1">row center-to-center</p>
                       )}
                     </CardContent>
                   </Card>
@@ -616,13 +763,22 @@ export function CropPlanner() {
                   {p.plan.totalPlants} plants · {p.plan.totalRows} rows
                 </p>
               </div>
-              <Button
-                variant="outline"
-                className="h-10 text-base shrink-0"
-                onClick={() => loadPlot(p)}
-              >
-                View &amp; Edit
-              </Button>
+              <div className="flex flex-col gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  className="h-10 text-base"
+                  onClick={() => loadPlot(p)}
+                >
+                  View &amp; Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 text-sm text-muted-foreground hover:text-destructive"
+                  onClick={() => deletePlot(p.id)}
+                >
+                  Delete
+                </Button>
+              </div>
             </div>
           ))}
         </div>
